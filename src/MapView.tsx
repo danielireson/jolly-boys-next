@@ -1,28 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
 import { MapContainer, TileLayer, Marker, Popup, useMap, useMapEvents } from "react-leaflet";
 import L from "leaflet";
-import type { Property, Bounds } from "./types";
+import type { Property } from "./types";
 import { money } from "./data";
 
-function WatchMap({ onBounds }: { onBounds: (b: Bounds) => void }) {
-  const map = useMapEvents({
-    moveend: () => {
-      const b = map.getBounds();
-      onBounds([
-        [b.getSouth(), b.getWest()],
-        [b.getNorth(), b.getEast()],
-      ]);
-    },
-  });
-  useEffect(() => {
-    const b = map.getBounds();
-    onBounds([
-      [b.getSouth(), b.getWest()],
-      [b.getNorth(), b.getEast()],
-    ]);
-  }, [map]);
-  return null;
-}
 // The map starts inside a hidden container in list view, so resize and recentre once it's shown.
 function AutoSize({ center, zoom }: { center: [number, number]; zoom: number }) {
   const map = useMap();
@@ -122,7 +103,6 @@ export default function MapView({
   hovered,
   onHover,
   onOpen,
-  onBounds,
   property,
   transport = false,
 }: {
@@ -130,7 +110,6 @@ export default function MapView({
   hovered: string | null;
   onHover: (id: string | null) => void;
   onOpen: (p: Property) => void;
-  onBounds?: (b: Bounds) => void;
   property?: Property;
   transport?: boolean;
 }) {
@@ -144,7 +123,6 @@ export default function MapView({
         url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
       />
       <AutoSize center={center} zoom={property ? 11 : 6} />
-      {onBounds && <WatchMap onBounds={onBounds} />}
       <FitOne property={property} />
       {transport && property ? (
         <>

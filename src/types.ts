@@ -55,7 +55,6 @@ export type Property = {
   score_value_for_money: number | null;
   score_local_amenities: number | null;
 };
-export type Bounds = [[number, number], [number, number]] | null;
 export type Filters = {
   priceMin: number;
   priceMax: number;
@@ -86,8 +85,6 @@ export type Search = {
   category: string;
   sort: string;
   filters: Filters;
-  bounds: Bounds;
-  mapSearch: boolean;
   view: "list" | "map";
 };
 export type Store = { recent: string[] };

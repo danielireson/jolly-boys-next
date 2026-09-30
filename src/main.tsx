@@ -13,7 +13,7 @@ import {
   ArrowLeft,
 } from "lucide-react";
 import MapView from "./MapView";
-import type { Property, Search, Store, Bounds } from "./types";
+import type { Property, Search, Store } from "./types";
 import {
   properties,
   categories,
@@ -510,9 +510,6 @@ function App() {
   const [store, setStore] = useState<Store>(readStore);
   const [hovered, setHovered] = useState<string | null>(null);
   const [mobileMap, setMobileMap] = useState(false);
-  const [sheetHeight, setSheetHeight] = useState(28);
-  const sheetDrag = useRef<{ startY: number; startHeight: number } | null>(null);
-  const boundsTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(() => {
     localStorage.setItem(STORE_KEY, JSON.stringify(store));
   }, [store]);
@@ -559,11 +556,6 @@ function App() {
       ),
     [search],
   );
-  const onBounds = (b: Bounds) => {
-    if (!search.mapSearch) return;
-    if (boundsTimer.current) clearTimeout(boundsTimer.current);
-    boundsTimer.current = setTimeout(() => setSearch((s) => ({ ...s, bounds: b })), 200);
-  };
   const listing = page.listing && properties.find((p) => p.property_code === page.listing);
   return (
     <>
@@ -708,11 +700,6 @@ function App() {
                 total ×
               </button>
             )}
-            {search.mapSearch && (
-              <button onClick={() => setSearch({ ...search, mapSearch: false, bounds: null })}>
-                Map area ×
-              </button>
-            )}
           </div>
           {store.recent.length > 0 && (
             <section className="recently-viewed wrap">
@@ -759,61 +746,7 @@ function App() {
                 hovered={hovered}
                 onHover={setHovered}
                 onOpen={(p) => go({ listing: p.property_code })}
-                onBounds={onBounds}
               />
-              <label className="map-search-toggle">
-                <input
-                  type="checkbox"
-                  checked={search.mapSearch}
-                  onChange={(e) =>
-                    setSearch({
-                      ...search,
-                      mapSearch: e.target.checked,
-                      bounds: e.target.checked ? search.bounds : null,
-                    })
-                  }
-                />{" "}
-                Search as I move the map
-              </label>
-              <div className="map-result-sheet" style={{ height: `${sheetHeight}vh` }}>
-                <div
-                  className="sheet-handle"
-                  role="slider"
-                  aria-label="Results sheet height"
-                  aria-valuemin={18}
-                  aria-valuemax={75}
-                  aria-valuenow={sheetHeight}
-                  tabIndex={0}
-                  onKeyDown={(e) => {
-                    if (e.key === "ArrowUp") setSheetHeight((h) => Math.min(75, h + 5));
-                    if (e.key === "ArrowDown") setSheetHeight((h) => Math.max(18, h - 5));
-                  }}
-                  onPointerDown={(e) => {
-                    sheetDrag.current = { startY: e.clientY, startHeight: sheetHeight };
-                    e.currentTarget.setPointerCapture(e.pointerId);
-                  }}
-                  onPointerMove={(e) => {
-                    if (!sheetDrag.current) return;
-                    const delta = ((sheetDrag.current.startY - e.clientY) / innerHeight) * 100;
-                    setSheetHeight(
-                      Math.max(18, Math.min(75, sheetDrag.current.startHeight + delta)),
-                    );
-                  }}
-                  onPointerUp={() => (sheetDrag.current = null)}
-                />
-                <strong>{rows.length} cottages in view</strong>
-                <div>
-                  {rows.slice(0, 8).map((p) => (
-                    <button key={p.property_code} onClick={() => go({ listing: p.property_code })}>
-                      <img src={p.image_urls[0]} alt="" />
-                      <span>
-                        {p.name}
-                        <small>{money(p.price_gbp)} for 7 nights</small>
-                      </span>
-                    </button>
-                  ))}
-                </div>
-              </div>
             </div>
           </div>
           <button

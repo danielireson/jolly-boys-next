@@ -64,8 +64,6 @@ export const defaultSearch: Search = {
   category: "all",
   sort: "recommended",
   filters: defaultFilters,
-  bounds: null,
-  mapSearch: false,
   view: "list",
 };
 export const money = (n: number | null | undefined) =>
@@ -80,7 +78,7 @@ export const has = (p: Property, key: string) => p[key] === true;
 export function isFavourite(p: Property) {
   return has(p, "feature_customers_choice") || p.awards.includes("Customers' Choice");
 }
-export function match(p: Property, s: Search, ignoreCategory = false, ignoreBounds = false) {
+export function match(p: Property, s: Search, ignoreCategory = false) {
   const f = s.filters;
   if (
     s.where &&
@@ -142,11 +140,6 @@ export function match(p: Property, s: Search, ignoreCategory = false, ignoreBoun
       .includes(f.keyword.toLowerCase())
   )
     return false;
-  if (!ignoreBounds && s.mapSearch && s.bounds) {
-    const [[south, west], [north, east]] = s.bounds;
-    if (p.latitude < south || p.latitude > north || p.longitude < west || p.longitude > east)
-      return false;
-  }
   return true;
 }
 export function sorted(rows: Property[], sort: string) {
