@@ -839,7 +839,7 @@ function App() {
       )}
       <footer className="site-footer">
         <div className="wrap">
-          <span>Big cottages with hot tubs for 6+ friends · England, Scotland & Wales</span>
+          <span>Jolly boys next year · Big cottages with hot tubs in England, Scotland & Wales</span>
           <span>
             Prices are a snapshot from 30 Sep 2026 for 7 nights in September 2027. Always check
             the live price and availability on cottages.com before you book.

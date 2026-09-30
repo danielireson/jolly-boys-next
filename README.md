@@ -1,4 +1,4 @@
-# Gather cottage search
+# Jolly boys next year
 
 A static React, TypeScript and CSS app for exploring the 30 September 2026 cottage snapshot. It uses the collected CSV and review JSON in `tmp/`; no backend or account is required.
 
