@@ -7,6 +7,7 @@
     "dev": "vite --host 0.0.0.0",
     "build": "tsc -b && vite build",
     "preview": "vite preview --host 0.0.0.0",
+    "places": "python3 scripts/enrich_places.py",
     "data": "python3 scripts/build_data.py",
     "check:data": "python3 scripts/check_data.py"
   },

@@ -40,8 +40,6 @@ export const defaultFilters: Filters = {
   bedrooms: 0,
   bathrooms: 0,
   ownBeds: 0,
-  strict: false,
-  includeUnknown: false,
   privateHotTub: false,
   railKm: 0,
   busKm: 0,
@@ -74,6 +72,8 @@ export const dateText = (s: string) =>
     month: "short",
     year: "numeric",
   });
+export const duration = (min: number | null | undefined) =>
+  min == null ? "—" : min < 60 ? `${min} min` : `${Math.floor(min / 60)}h ${min % 60}m`;
 export const has = (p: Property, key: string) => p[key] === true;
 export function isFavourite(p: Property) {
   return has(p, "feature_customers_choice") || p.awards.includes("Customers' Choice");
@@ -94,13 +94,7 @@ export function match(p: Property, s: Search, ignoreCategory = false) {
   )
     return false;
   if (!ignoreCategory && s.category !== "all" && !has(p, s.category)) return false;
-  if (
-    s.everyoneBed &&
-    p.max_single_sleepers !== null &&
-    (s.filters.strict ? p.single_beds : p.max_single_sleepers)! < s.guests
-  )
-    return false;
-  if (s.everyoneBed && p.max_single_sleepers === null && !f.includeUnknown) return false;
+  if (s.everyoneBed && p.own_beds < s.guests) return false;
   const price = p.price_gbp;
   if (
     price < f.priceMin ||
@@ -109,9 +103,7 @@ export function match(p: Property, s: Search, ignoreCategory = false) {
     p.bathrooms < f.bathrooms
   )
     return false;
-  const beds = f.strict ? p.single_beds : p.max_single_sleepers;
-  if (f.ownBeds > 0 && beds !== null && beds < f.ownBeds) return false;
-  if (f.ownBeds > 0 && beds === null && !f.includeUnknown) return false;
+  if (p.own_beds < f.ownBeds) return false;
   if (f.privateHotTub && p.hot_tub_privacy !== "Private") return false;
   if (
     f.railKm > 0 &&
@@ -161,4 +153,67 @@ export function activeCount(f: Filters) {
   return Object.entries(f).filter(
     ([k, v]) => JSON.stringify(v) !== JSON.stringify(defaultFilters[k as keyof Filters]),
   ).length;
+}
+
+// Short URL keys. Only values that differ from defaultSearch are written.
+const queryKeys = {
+  q: "where",
+  from: "startMin",
+  to: "startMax",
+  g: "guests",
+  eb: "everyoneBed",
+  c: "category",
+  o: "sort",
+  v: "view",
+  min: "filters.priceMin",
+  max: "filters.priceMax",
+  bd: "filters.bedrooms",
+  ba: "filters.bathrooms",
+  ob: "filters.ownBeds",
+  ht: "filters.privateHotTub",
+  rail: "filters.railKm",
+  bus: "filters.busKm",
+  am: "filters.amenities",
+  fav: "filters.favourite",
+  r: "filters.minRating",
+  cl: "filters.minCleanliness",
+  la: "filters.levelAccess",
+  gf: "filters.groundFloor",
+  wc: "filters.wheelchair",
+  pet: "filters.pets",
+  k: "filters.keyword",
+} as const;
+type Field = string | number | boolean | string[];
+const fieldOf = (s: Search, path: string): Field =>
+  path.startsWith("filters.")
+    ? s.filters[path.slice(8) as keyof Filters]
+    : (s[path as keyof Search] as Field);
+export const searchKeys = Object.keys(queryKeys);
+export function toQuery(s: Search) {
+  const q = new URLSearchParams();
+  for (const [key, path] of Object.entries(queryKeys)) {
+    const value = fieldOf(s, path);
+    if (JSON.stringify(value) === JSON.stringify(fieldOf(defaultSearch, path))) continue;
+    q.set(key, Array.isArray(value) ? value.join(",") : value === true ? "1" : String(value));
+  }
+  return q;
+}
+export function fromQuery(q: URLSearchParams): Search {
+  const s: Search = { ...defaultSearch, filters: { ...defaultFilters } };
+  for (const [key, path] of Object.entries(queryKeys)) {
+    const raw = q.get(key);
+    if (raw === null) continue;
+    const fallback = fieldOf(defaultSearch, path);
+    const value: Field = Array.isArray(fallback)
+      ? raw.split(",").filter(Boolean)
+      : typeof fallback === "boolean"
+        ? raw === "1"
+        : typeof fallback === "number"
+          ? Number(raw) || 0
+          : raw;
+    if (path.startsWith("filters.")) Object.assign(s.filters, { [path.slice(8)]: value });
+    else Object.assign(s, { [path]: value });
+  }
+  if (s.view !== "map") s.view = "list";
+  return s;
 }

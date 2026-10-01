@@ -23,7 +23,8 @@ export type Property = {
   review_count: number | null;
   hot_tub_privacy: string;
   single_beds: number | null;
-  max_single_sleepers: number | null;
+  own_beds: number;
+  own_beds_estimated: boolean;
   bed_capacity: number | null;
   zip_link_beds: number | null;
   bunk_beds: number | null;
@@ -36,6 +37,17 @@ export type Property = {
   nearest_bus_distance_km: number | null;
   nearest_bus_lat: number | null;
   nearest_bus_long: number | null;
+  drive_manchester_min: number | null;
+  drive_manchester_km: number | null;
+  drive_london_min: number | null;
+  drive_london_km: number | null;
+  nearest_shop_name: string | null;
+  nearest_shop_brand: string | null;
+  nearest_shop_lat: number | null;
+  nearest_shop_long: number | null;
+  nearest_shop_distance_km: number | null;
+  nearest_shop_drive_km: number | null;
+  nearest_shop_drive_min: number | null;
   image_urls: string[];
   image_captions: string[];
   features_all: string[];
@@ -61,8 +73,6 @@ export type Filters = {
   bedrooms: number;
   bathrooms: number;
   ownBeds: number;
-  strict: boolean;
-  includeUnknown: boolean;
   privateHotTub: boolean;
   railKm: number;
   busKm: number;

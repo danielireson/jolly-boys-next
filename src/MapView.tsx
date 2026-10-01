@@ -4,15 +4,43 @@ import L from "leaflet";
 import type { Property } from "./types";
 import { money } from "./data";
 
+type View = { center: [number, number]; zoom: number };
+const ukView: View = { center: [53.55, -2.55], zoom: 6 };
+// The results map position is kept in ?m=lat,lng,zoom so going back to the list restores it.
+function savedView(): View {
+  const [lat, lng, zoom] = (new URLSearchParams(location.search).get("m") || "")
+    .split(",")
+    .map(Number);
+  return [lat, lng, zoom].every(Number.isFinite) && zoom > 0
+    ? { center: [lat, lng], zoom }
+    : ukView;
+}
+function RememberView() {
+  const map = useMap();
+  useMapEvents({
+    moveend: () => {
+      // Ignore moves while the map is hidden in list view.
+      if (!map.getContainer().clientWidth) return;
+      const c = map.getCenter();
+      const q = new URLSearchParams(location.search);
+      q.set("m", `${c.lat.toFixed(4)},${c.lng.toFixed(4)},${map.getZoom()}`);
+      history.replaceState(history.state, "", `?${q}`);
+    },
+  });
+  return null;
+}
 // The map starts inside a hidden container in list view, so resize and recentre once it's shown.
-function AutoSize({ center, zoom }: { center: [number, number]; zoom: number }) {
+function AutoSize({ view }: { view: () => View }) {
   const map = useMap();
   useEffect(() => {
     const el = map.getContainer();
     let hidden = !el.clientWidth;
     const observer = new ResizeObserver(() => {
       map.invalidateSize();
-      if (hidden && el.clientWidth) map.setView(center, zoom);
+      if (hidden && el.clientWidth) {
+        const { center, zoom } = view();
+        map.setView(center, zoom);
+      }
       hidden = !el.clientWidth;
     });
     observer.observe(el);
@@ -88,7 +116,7 @@ function Pins({
                   <span>
                     {p.location_full} · {money(p.price_gbp)} for 7 nights
                   </span>
-                  <button onClick={() => onOpen(p)}>View cottage</button>
+                  <button onClick={() => onOpen(p)}>View property</button>
                 </div>
               </Popup>
             )}
@@ -113,17 +141,23 @@ export default function MapView({
   property?: Property;
   transport?: boolean;
 }) {
-  const center: [number, number] = property
-    ? [property.latitude, property.longitude]
-    : [53.55, -2.55];
+  const view = (): View =>
+    property ? { center: [property.latitude, property.longitude], zoom: 11 } : savedView();
+  const [initial] = useState(view);
   return (
-    <MapContainer center={center} zoom={property ? 11 : 6} scrollWheelZoom className="map-canvas">
+    <MapContainer
+      center={initial.center}
+      zoom={initial.zoom}
+      scrollWheelZoom
+      className="map-canvas"
+    >
       <TileLayer
         attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
         url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
       />
-      <AutoSize center={center} zoom={property ? 11 : 6} />
+      <AutoSize view={view} />
       <FitOne property={property} />
+      {!property && <RememberView />}
       {transport && property ? (
         <>
           <Marker
@@ -158,6 +192,18 @@ export default function MapView({
               })}
             >
               <Popup>{property.nearest_bus_name}</Popup>
+            </Marker>
+          )}
+          {property.nearest_shop_lat && property.nearest_shop_long && (
+            <Marker
+              position={[property.nearest_shop_lat, property.nearest_shop_long]}
+              icon={L.divIcon({
+                html: '<div class="transport-pin">🛒</div>',
+                className: "pin-wrap",
+                iconSize: [38, 38],
+              })}
+            >
+              <Popup>{property.nearest_shop_name}</Popup>
             </Marker>
           )}
         </>

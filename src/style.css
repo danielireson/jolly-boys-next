@@ -309,10 +309,22 @@ a {
   place-items: center;
   opacity: 0;
   transition: opacity 0.15s;
+  touch-action: manipulation;
+}
+/* Larger invisible tap target around the 28px circle. */
+.carousel button::before {
+  content: "";
+  position: absolute;
+  inset: -8px;
 }
 .card:hover .carousel button,
-.carousel button:focus {
+.carousel button:focus-visible {
   opacity: 1;
+}
+@media (hover: none) {
+  .carousel button {
+    opacity: 0.9;
+  }
 }
 .carousel-prev {
   left: 10px;
@@ -876,10 +888,6 @@ a {
   .results-map {
     display: none;
   }
-  .results-layout.mobile-map-on .results-list {
-    display: none;
-  }
-  .results-layout.mobile-map-on .results-map,
   .results-layout.map .results-map {
     display: block;
     position: fixed;

@@ -7,6 +7,8 @@ import {
   ChevronLeft,
   ChevronRight,
   Train,
+  Car,
+  ShoppingBasket,
   BedDouble,
   Star,
   Check,
@@ -22,6 +24,10 @@ import {
   defaultSearch,
   money,
   dateText,
+  duration,
+  toQuery,
+  fromQuery,
+  searchKeys,
   match,
   sorted,
   isFavourite,
@@ -29,18 +35,27 @@ import {
 import "leaflet/dist/leaflet.css";
 import "./style.css";
 
-const STORE_KEY = "cottages:v1";
+const STORE_KEY = "properties:v1";
+const OLD_STORE_KEY = "cottages:v1";
 const blankStore: Store = { recent: [] };
 function readStore(): Store {
   try {
+    // Carry over recently viewed items saved before the rename.
+    const old = localStorage.getItem(OLD_STORE_KEY);
+    if (old !== null) {
+      if (localStorage.getItem(STORE_KEY) === null) localStorage.setItem(STORE_KEY, old);
+      localStorage.removeItem(OLD_STORE_KEY);
+    }
     return { ...blankStore, ...JSON.parse(localStorage.getItem(STORE_KEY) || "{}") };
   } catch {
     return blankStore;
   }
 }
 function parseSearch(): Search {
+  const q = new URLSearchParams(location.search);
+  // Older links stored the whole search as JSON in ?s=
   try {
-    const raw = new URLSearchParams(location.search).get("s");
+    const raw = q.get("s");
     if (raw) {
       const s = JSON.parse(raw);
       return {
@@ -51,7 +66,7 @@ function parseSearch(): Search {
       };
     }
   } catch {}
-  return defaultSearch;
+  return fromQuery(q);
 }
 function getPage() {
   const q = new URLSearchParams(location.search);
@@ -125,9 +140,33 @@ function Modal({
 }
 function Carousel({ p, hero = false }: { p: Property; hero?: boolean }) {
   const [index, setIndex] = useState(0);
+  const touchX = useRef<number | null>(null);
+  const swiped = useRef(false);
   const imgs = p.image_urls;
+  const step = (by: number) => setIndex((i) => (i + by + imgs.length) % imgs.length);
   return (
-    <div className={`carousel ${hero ? "hero-carousel" : ""}`}>
+    <div
+      className={`carousel ${hero ? "hero-carousel" : ""}`}
+      onTouchStart={(e) => {
+        touchX.current = e.touches[0].clientX;
+        swiped.current = false;
+      }}
+      onTouchEnd={(e) => {
+        if (touchX.current === null || imgs.length < 2) return;
+        const dx = e.changedTouches[0].clientX - touchX.current;
+        touchX.current = null;
+        if (Math.abs(dx) < 40) return;
+        swiped.current = true;
+        step(dx < 0 ? 1 : -1);
+      }}
+      onClickCapture={(e) => {
+        // A swipe still fires a click on the photo; don't open the listing.
+        if (swiped.current) {
+          e.stopPropagation();
+          swiped.current = false;
+        }
+      }}
+    >
       <img
         loading={hero ? "eager" : "lazy"}
         src={imgs[index] || ""}
@@ -140,7 +179,7 @@ function Carousel({ p, hero = false }: { p: Property; hero?: boolean }) {
             aria-label="Previous photo"
             onClick={(e) => {
               e.stopPropagation();
-              setIndex((index - 1 + imgs.length) % imgs.length);
+              step(-1);
             }}
           >
             <ChevronLeft size={18} />
@@ -150,7 +189,7 @@ function Carousel({ p, hero = false }: { p: Property; hero?: boolean }) {
             aria-label="Next photo"
             onClick={(e) => {
               e.stopPropagation();
-              setIndex((index + 1) % imgs.length);
+              step(1);
             }}
           >
             <ChevronRight size={18} />
@@ -194,8 +233,8 @@ function Card({
         </div>
         <p className="card-name">{p.name}</p>
         <p>
-          {p.bedrooms} bedrooms · {p.sleeps} guests · Beds:{" "}
-          {p.max_single_sleepers === null ? "unknown" : `${p.max_single_sleepers} own`}
+          {p.bedrooms} bedrooms · {p.sleeps} guests · Beds: {p.own_beds}
+          {p.own_beds_estimated ? "+" : ""} own
         </p>
         <p>
           <Train size={14} />
@@ -235,7 +274,7 @@ function Listing({
     <>
       <main className="listing wrap">
         <button className="back-link" onClick={onBack}>
-          <ArrowLeft size={18} /> All cottages
+          <ArrowLeft size={18} /> All properties
         </button>
         <div className="listing-heading">
           <div>
@@ -290,14 +329,12 @@ function Listing({
                   <BedDouble />
                   <span>
                     <strong>
-                      {p.max_single_sleepers === null
-                        ? "Beds: unknown"
-                        : `Own beds for ${p.max_single_sleepers}`}
+                      Own beds for {p.own_beds_estimated ? `at least ${p.own_beds}` : p.own_beds}
                     </strong>
                     <small>
-                      {p.single_beds === null
-                        ? "No layout available"
-                        : `${p.single_beds} fixed singles · ${p.zip_link_beds ?? 0} split beds`}
+                      {p.own_beds_estimated
+                        ? "One per bedroom · no layout available"
+                        : `${p.single_beds ?? 0} singles · ${p.zip_link_beds ?? 0} zip & link · ${p.double_beds ?? 0} doubles`}
                     </small>
                   </span>
                 </div>
@@ -407,7 +444,23 @@ function Listing({
                 🚌 {p.nearest_bus_name || "Bus stop unknown"} ·{" "}
                 {p.nearest_bus_distance_km?.toFixed(1) ?? "—"} km
               </p>
-              <small>Distances are straight-line estimates.</small>
+              <p>
+                <Car size={17} /> Manchester · {duration(p.drive_manchester_min)} (
+                {p.drive_manchester_km?.toFixed(0) ?? "—"} km)
+              </p>
+              <p>
+                <Car size={17} /> London · {duration(p.drive_london_min)} (
+                {p.drive_london_km?.toFixed(0) ?? "—"} km)
+              </p>
+              <p>
+                <ShoppingBasket size={17} />{" "}
+                {p.nearest_shop_name
+                  ? `${p.nearest_shop_name} · ${(p.nearest_shop_drive_km ?? p.nearest_shop_distance_km)?.toFixed(1)} km${p.nearest_shop_drive_min != null ? ` drive (${duration(p.nearest_shop_drive_min)})` : ""}`
+                  : "Nearest Booths or Waitrose unknown"}
+              </p>
+              <small>
+                Rail and bus distances are straight-line; drive times are estimates without traffic.
+              </small>
             </section>
             <section>
               <h2>Things to know</h2>
@@ -509,14 +562,16 @@ function App() {
   const [page, setPage] = useState(getPage);
   const [store, setStore] = useState<Store>(readStore);
   const [hovered, setHovered] = useState<string | null>(null);
-  const [mobileMap, setMobileMap] = useState(false);
   useEffect(() => {
     localStorage.setItem(STORE_KEY, JSON.stringify(store));
   }, [store]);
   useEffect(() => {
     const q = new URLSearchParams(location.search);
-    q.set("s", JSON.stringify(search));
-    history.replaceState({}, "", `?${q.toString()}`);
+    q.delete("s");
+    searchKeys.forEach((key) => q.delete(key));
+    toQuery(search).forEach((value, key) => q.set(key, value));
+    const query = q.toString();
+    history.replaceState({}, "", query ? `?${query}` : location.pathname);
   }, [search]);
   useEffect(() => {
     const onPop = () => {
@@ -532,7 +587,7 @@ function App() {
       if (v === null) q.delete(k);
       else q.set(k, v);
     }
-    history.pushState({}, "", `?${q}`);
+    history.pushState({}, "", q.size ? `?${q}` : location.pathname);
     setPage(getPage());
     scrollTo(0, 0);
   };
@@ -561,7 +616,7 @@ function App() {
     <>
       <header className="site-header">
         <div className="header-inner">
-          <button className="brand" aria-label="All cottages" onClick={() => go({ listing: null })}>
+          <button className="brand" aria-label="All properties" onClick={() => go({ listing: null })}>
             <img src={`${import.meta.env.BASE_URL}logo.jpg`} alt="" />
           </button>
         </div>
@@ -575,7 +630,7 @@ function App() {
         />
       ) : (
         <>
-          <nav className="category-bar" aria-label="Cottage categories">
+          <nav className="category-bar" aria-label="Property categories">
             <div className="category-scroll wrap">
               {categories
                 .filter(([, key]) => key === "all" || categoryCounts[key] > 0)
@@ -593,7 +648,9 @@ function App() {
           </nav>
           <div className="toolbar wrap">
             <div>
-              <h1>{rows.length} cottages</h1>
+              <h1>
+                {rows.length} {rows.length === 1 ? "property" : "properties"}
+              </h1>
               <p>7 nights around September 2027 · England, Scotland & Wales</p>
             </div>
             <div className="toolbar-actions">
@@ -717,7 +774,7 @@ function App() {
               </div>
             </section>
           )}
-          <div className={`results-layout ${search.view} ${mobileMap ? "mobile-map-on" : ""}`}>
+          <div className={`results-layout ${search.view}`}>
             <div className="results-list">
               {rows.length ? (
                 <div className="card-grid">
@@ -732,7 +789,7 @@ function App() {
                 </div>
               ) : (
                 <div className="empty-results">
-                  <h2>No cottages found</h2>
+                  <h2>No properties found</h2>
                   <p>Try a wider date range or clear some filters.</p>
                   <button className="primary" onClick={() => setSearch({ ...defaultSearch })}>
                     Clear search
@@ -751,14 +808,9 @@ function App() {
           </div>
           <button
             className="mobile-map-toggle"
-            onClick={() => {
-              if (search.view === "map") {
-                setSearch({ ...search, view: "list" });
-                setMobileMap(false);
-              } else setMobileMap(!mobileMap);
-            }}
+            onClick={() => setSearch({ ...search, view: search.view === "map" ? "list" : "map" })}
           >
-            {mobileMap || search.view === "map" ? (
+            {search.view === "map" ? (
               <>
                 <List size={17} /> List
               </>
@@ -772,7 +824,7 @@ function App() {
       )}
       <footer className="site-footer">
         <div className="wrap">
-          <span>Jolly boys next year · Big cottages with hot tubs in England, Scotland & Wales</span>
+          <span>Jolly boys next year · Big properties with hot tubs in England, Scotland & Wales</span>
           <span>
             Prices are a snapshot from 30 Sep 2026 for 7 nights in September 2027. Always check
             the live price and availability on cottages.com before you book.
