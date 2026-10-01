@@ -74,6 +74,32 @@ export const dateText = (s: string) =>
   });
 export const duration = (min: number | null | undefined) =>
   min == null ? "—" : min < 60 ? `${min} min` : `${Math.floor(min / 60)}h ${min % 60}m`;
+const plural = (n: number, one: string, many = one + "s") => `${n} ${n === 1 ? one : many}`;
+// Explains how own_beds was counted, so the parts add up to the total.
+export function ownBedsBreakdown(p: Property) {
+  if (p.own_beds_estimated) return "One per bedroom · no layout available";
+  const n = (v: number | null) => v ?? 0;
+  const singles = n(p.single_beds),
+    zips = n(p.zip_link_beds),
+    bunks = n(p.bunk_beds),
+    bunkPlaces = n(p.bunk_sleeping_places),
+    pullouts = n(p.day_pullout_beds),
+    doubles = n(p.double_beds);
+  const parts = [
+    singles && plural(singles, "single"),
+    zips && `${plural(zips, "zip & link")} (${zips * 2})`,
+    bunks && `${plural(bunks, "bunk")} (${bunkPlaces})`,
+    pullouts && plural(pullouts, "day or pull-out bed"),
+    doubles && plural(doubles, "double"),
+  ].filter(Boolean);
+  const counted = singles + zips * 2 + bunkPlaces + pullouts + doubles;
+  if (p.own_beds > counted)
+    parts.push(`${p.own_beds - counted} more, one per remaining bedroom`);
+  if (p.own_beds < counted) parts.push(`limited to ${p.sleeps} guests`);
+  const extra = n(p.sofa_beds_single) + n(p.sofa_beds_double) + n(p.flexible_beds);
+  if (extra) parts.push(`${plural(extra, "sofa or flexible bed")} not counted`);
+  return parts.join(" · ");
+}
 export const has = (p: Property, key: string) => p[key] === true;
 export function isFavourite(p: Property) {
   return has(p, "feature_customers_choice") || p.awards.includes("Customers' Choice");

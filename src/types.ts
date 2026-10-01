@@ -28,6 +28,11 @@ export type Property = {
   bed_capacity: number | null;
   zip_link_beds: number | null;
   bunk_beds: number | null;
+  bunk_sleeping_places: number | null;
+  sofa_beds_single: number | null;
+  sofa_beds_double: number | null;
+  day_pullout_beds: number | null;
+  flexible_beds: number | null;
   double_beds: number | null;
   nearest_rail_name: string;
   nearest_rail_distance_km: number | null;

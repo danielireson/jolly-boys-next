@@ -25,6 +25,7 @@ import {
   money,
   dateText,
   duration,
+  ownBedsBreakdown,
   toQuery,
   fromQuery,
   searchKeys,
@@ -332,9 +333,7 @@ function Listing({
                       Own beds for {p.own_beds_estimated ? `at least ${p.own_beds}` : p.own_beds}
                     </strong>
                     <small>
-                      {p.own_beds_estimated
-                        ? "One per bedroom · no layout available"
-                        : `${p.single_beds ?? 0} singles · ${p.zip_link_beds ?? 0} zip & link · ${p.double_beds ?? 0} doubles`}
+                      {ownBedsBreakdown(p)}
                     </small>
                   </span>
                 </div>
